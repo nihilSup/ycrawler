@@ -8,7 +8,7 @@ import logging
 import asyncio
 import os
 import re
-from functools import partial
+import urllib
 
 import aiohttp
 
@@ -47,13 +47,15 @@ async def crawl_page(session, page_id, visited_urls):
         return
     logging.debug('new page data: {}'.format(item_data))
     dir_ = './pages/' + re.sub('\.html$', '', page_url.replace('/', '.'))
-    await process_page(session, page_url, dir_)
+    await download_page(session, page_url, dir_)
     visited_urls.add(page_url)
     if 'kids' in item_data:
+        logging.info('Start crawling comments for page {}'.format(page_id))
         await asyncio.gather(*[crawl_comments(session, comm_id, dir_)
                                 for comm_id in item_data['kids']])
+        logging.info('Finished crawling comments for page {}'.format(page_id))
     else:
-        logging.debug('No comments for page {}'.format(page_id))
+        logging.info('No comments for page {}'.format(page_id))
     logging.info('Finished crawling page {}'.format(page_id))
 
 
@@ -74,35 +76,48 @@ async def save_page(data, fname, dir_):
         f.write(data)
 
 
-async def process_page(session, page_url, dir_):
+async def download_page(session, page_url, dir_):
+    logging.info('Downloading new page')
     try:
         page_html = await fetch_html(session, page_url)
         name = page_url.replace('/', '.')
         await save_page(page_html, name, dir_)
-        msg = 'Page {} saved to disk'
-        logging.debug(msg.format(page_url))
     except Exception as e:
         logging.exception(e)
-        return
+        return None
+    else:
+        msg = 'Page <{}> saved to disk'
+        logging.info(msg.format(page_url))
+        return page_url
 
 
-async def crawl_comments(session, comment_id, dir_, pattern=None):
+async def crawl_comments(session, comment_id, dir_, pattern=None, vstd_urls=None):
     if not pattern:
         pattern = re.compile(r'href="(.*?)"')
+    if not vstd_urls:
+        vstd_urls = set()
     try:
         comment_data = await fetch_json(session, hn_api.item_url(comment_id))
     except Exception as e:
         logging.exception(e)
         return
-    logging.debug('Comment {} data: {}'.format(comment_id, comment_data))
-    comm_text = getattr(comment_data, 'text', '')
-    await asyncio.gather(*[process_page(session, link, dir_)
-                           for link in pattern.findall(comm_text)])
-        
-    if 'kids' not in comment_data:
-        return
-    await asyncio.gather(*[crawl_comments(session, kid_id, dir_) 
-                           for kid_id in comment_data['kids']])
+    logging.debug('Comment {} data:\n{}'.format(comment_id, comment_data))
+    comm_text = comment_data.get('text', '')
+    logging.debug('Comment {} text:\n{}'.format(comment_id, comm_text))
+    coros = []
+    for link in pattern.findall(comm_text):
+        link = link.replace('&#x2F;', '/')
+        if link not in vstd_urls:
+            coros.append(download_page(session, link, dir_))
+    results = await asyncio.gather(*coros)
+    vstd_urls.update([res for res in results if res])
+
+    kids_ids = comment_data.get('kids', [])
+    if kids_ids:
+        logging.info('crawling comments for comment {}'.format(comment_id))
+        await asyncio.gather(*[crawl_comments(session, kid_id, dir_,
+                                              vstd_urls=vstd_urls)
+                            for kid_id in kids_ids])
 
 
 if __name__ == '__main__':
