@@ -31,11 +31,15 @@ def parse_args():
 async def main(N, interval):
     async with aiohttp.ClientSession() as session:
         visited_urls = set()
-        top_items_ids = await fetch_json(session, hn_api.TOP_STORIES)
-        logging.debug('Top items ids: {} ...'.format(top_items_ids[:5]))
-        coros = [crawl_page(session, item_id, visited_urls)
-                 for item_id in top_items_ids[0:N]]
-        await asyncio.gather(*coros)
+        while True:
+            top_items_ids = await fetch_json(session, hn_api.TOP_STORIES)
+            logging.debug('Top items ids: {} ...'.format(top_items_ids[:5]))
+            coros = [crawl_page(session, item_id, visited_urls)
+                    for item_id in top_items_ids[0:N]]
+            await asyncio.gather(*coros)
+            logging.info('Finished fetching cycle')
+            await asyncio.sleep(interval)
+        
 
 async def crawl_page(session, page_id, visited_urls):
     logging.info('Started processing new page {}'.format(page_id))
