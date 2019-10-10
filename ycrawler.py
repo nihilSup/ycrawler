@@ -35,9 +35,10 @@ async def main(N, interval):
         while True:
             top_items_ids = await fetch_json(session, hn_api.TOP_STORIES)
             logging.debug('Top items ids: {} ...'.format(top_items_ids[:5]))
-            await asyncio.gather(*[crawl_page(session, item_id, visited_urls)
-                                   for item_id in top_items_ids[0:N]])
-            logging.info('Finished fetching cycle')
+            main_fut = asyncio.gather(
+                *[crawl_page(session, item_id, visited_urls)
+                  for item_id in top_items_ids[0:N]])
+            main_fut.add_done_callback(lambda fut: logging.info('Finished fetching top news'))
             await asyncio.sleep(interval)
         
 
