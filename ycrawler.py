@@ -105,23 +105,24 @@ async def crawl_comments(session, comment_id, dir_, pattern=None, vstd_urls=None
     except Exception as e:
         logging.exception(e)
         return
-    logging.debug('Comment {} data:\n{}'.format(comment_id, comment_data))
-    comm_text = comment_data.get('text', '')
-    logging.debug('Comment {} text:\n{}'.format(comment_id, comm_text))
-    coros = []
-    for link in pattern.findall(comm_text):
-        link = link.replace('&#x2F;', '/')
-        if link not in vstd_urls:
-            coros.append(download_page(session, link, dir_))
-    results = await asyncio.gather(*coros)
-    vstd_urls.update([res for res in results if res])
+    else:
+        logging.debug('Comment {} data:\n{}'.format(comment_id, comment_data))
+        comm_text = comment_data.get('text', '')
+        logging.debug('Comment {} text:\n{}'.format(comment_id, comm_text))
+        coros = []
+        for link in pattern.findall(comm_text):
+            link = link.replace('&#x2F;', '/')
+            if link not in vstd_urls:
+                coros.append(download_page(session, link, dir_))
+        results = await asyncio.gather(*coros)
+        vstd_urls.update([res for res in results if res])
 
-    kids_ids = comment_data.get('kids', [])
-    if kids_ids:
-        logging.info('crawling comments for comment {}'.format(comment_id))
-        await asyncio.gather(*[crawl_comments(session, kid_id, dir_,
-                                              vstd_urls=vstd_urls)
-                            for kid_id in kids_ids])
+        kids_ids = comment_data.get('kids', [])
+        if kids_ids:
+            logging.info('crawling comments for comment {}'.format(comment_id))
+            await asyncio.gather(*[crawl_comments(session, kid_id, dir_,
+                                                vstd_urls=vstd_urls)
+                                for kid_id in kids_ids])
 
 
 if __name__ == '__main__':
