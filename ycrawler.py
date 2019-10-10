@@ -11,6 +11,7 @@ import re
 import urllib
 
 import aiohttp
+import aiofiles
 
 import hn_api
 
@@ -34,9 +35,8 @@ async def main(N, interval):
         while True:
             top_items_ids = await fetch_json(session, hn_api.TOP_STORIES)
             logging.debug('Top items ids: {} ...'.format(top_items_ids[:5]))
-            coros = [crawl_page(session, item_id, visited_urls)
-                    for item_id in top_items_ids[0:N]]
-            await asyncio.gather(*coros)
+            await asyncio.gather(*[crawl_page(session, item_id, visited_urls)
+                                   for item_id in top_items_ids[0:N]])
             logging.info('Finished fetching cycle')
             await asyncio.sleep(interval)
         
@@ -76,8 +76,8 @@ async def fetch_html(session, url):
 
 async def save_page(data, fname, dir_):
     os.makedirs(dir_, exist_ok=True)
-    with open(dir_ + '/' + fname, 'w+') as f:
-        f.write(data)
+    async with aiofiles.open(dir_ + '/' + fname, 'w+') as f:
+        await f.write(data)
 
 
 async def download_page(session, page_url, dir_):
