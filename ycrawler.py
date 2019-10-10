@@ -51,8 +51,7 @@ async def crawl_page(session, page_id, visited_urls):
         return
     logging.debug('new page data: {}'.format(item_data))
     dir_ = './pages/' + re.sub('\.html$', '', page_url.replace('/', '.'))
-    await download_page(session, page_url, dir_)
-    visited_urls.add(page_url)
+    asyncio.create_task(download_page(session, page_url, dir_, visited_urls))
     if 'kids' in item_data:
         logging.info('Start crawling comments for page {}'.format(page_id))
         await asyncio.gather(*[crawl_comments(session, comm_id, dir_)
@@ -80,19 +79,26 @@ async def save_page(data, fname, dir_):
         await f.write(data)
 
 
-async def download_page(session, page_url, dir_):
+async def download_page(session, page_url, dir_, vstd_urls):
     logging.info('Downloading new page')
+    if page_url in vstd_urls:
+        logging.info('Skipped previously visited page')
+        return
     try:
         page_html = await fetch_html(session, page_url)
         name = page_url.replace('/', '.')
-        await save_page(page_html, name, dir_)
+        if page_url not in vstd_urls:
+            await save_page(page_html, name, dir_)
+            vstd_urls.add(page_url)
+            msg = 'Page <{}> saved to disk'
+            logging.info(msg.format(page_url))
+        else:
+            logging.info('Skipped previously visited page')
     except Exception as e:
+        msg = 'Exception while downloading page <{}>'
+        logging.exception(msg.format(page_url))
         logging.exception(e)
-        return None
-    else:
-        msg = 'Page <{}> saved to disk'
-        logging.info(msg.format(page_url))
-        return page_url
+        return
 
 
 async def crawl_comments(session, comment_id, dir_, pattern=None, vstd_urls=None):
@@ -109,14 +115,11 @@ async def crawl_comments(session, comment_id, dir_, pattern=None, vstd_urls=None
         logging.debug('Comment {} data:\n{}'.format(comment_id, comment_data))
         comm_text = comment_data.get('text', '')
         logging.debug('Comment {} text:\n{}'.format(comment_id, comm_text))
-        coros = []
         for link in pattern.findall(comm_text):
             link = link.replace('&#x2F;', '/')
             if link not in vstd_urls:
-                coros.append(download_page(session, link, dir_))
-        results = await asyncio.gather(*coros)
-        vstd_urls.update([res for res in results if res])
-
+                asyncio.create_task(download_page(session, link, dir_,
+                                                  vstd_urls))
         kids_ids = comment_data.get('kids', [])
         if kids_ids:
             logging.info('crawling comments for comment {}'.format(comment_id))
