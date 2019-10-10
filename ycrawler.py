@@ -46,22 +46,15 @@ async def crawl_page(session, page_id, visited_urls):
         logging.info('Skipped, cause visited early')
         return
     logging.debug('new page data: {}'.format(item_data))
-    try:
-        page_html = await fetch_html(session, page_url)
-    except Exception as e:
-        logging.exception(e)
-        return
+    dir_ = './pages/' + re.sub('\.html$', '', page_url.replace('/', '.'))
+    await process_page(session, page_url, dir_)
+    visited_urls.add(page_url)
+    if 'kids' in item_data:
+        await asyncio.gather(*[crawl_comments(session, comm_id, dir_)
+                                for comm_id in item_data['kids']])
     else:
-        dir_, name = get_path(page_url)
-        await save_main_page(dir_, name, page_html)
-        msg = 'Page with id {} and name {} saved to disk'
-        logging.debug(msg.format(page_id, name))
-        visited_urls.add(page_url)
-        if 'kids' in item_data:
-            await crawl_comments(session, item_data['kids'])
-        else:
-            logging.debug('No comments for page {}'.format(page_id))
-        logging.info('Finished crawling page {}'.format(page_id))
+        logging.debug('No comments for page {}'.format(page_id))
+    logging.info('Finished crawling page {}'.format(page_id))
 
 
 async def fetch_json(session, url):
@@ -75,24 +68,41 @@ async def fetch_html(session, url):
         return await response.text()
 
 
-async def save_main_page(dir_, fname, data):
+async def save_page(data, fname, dir_):
     os.makedirs(dir_, exist_ok=True)
     with open(dir_ + '/' + fname, 'w+') as f:
         f.write(data)
 
 
-def get_path(page_url):
-    name = page_url.replace('/', '.')
-    return './pages/' + re.sub('\.html$', '', name), name
+async def process_page(session, page_url, dir_):
+    try:
+        page_html = await fetch_html(session, page_url)
+        name = page_url.replace('/', '.')
+        await save_page(page_html, name, dir_)
+        msg = 'Page {} saved to disk'
+        logging.debug(msg.format(page_url))
+    except Exception as e:
+        logging.exception(e)
+        return
 
 
-async def crawl_comments(session, comments_ids):
-    for comment_id in comments_ids:
-        try:
-            comment_data = fetch_json(session, hn_api.item_url(comment_id))
-        except Exception as e:
-            logging.exception(e)
-            
+async def crawl_comments(session, comment_id, dir_, pattern=None):
+    if not pattern:
+        pattern = re.compile(r'href="(.*?)"')
+    try:
+        comment_data = await fetch_json(session, hn_api.item_url(comment_id))
+    except Exception as e:
+        logging.exception(e)
+        return
+    logging.debug('Comment {} data: {}'.format(comment_id, comment_data))
+    comm_text = getattr(comment_data, 'text', '')
+    await asyncio.gather(*[process_page(session, link, dir_)
+                           for link in pattern.findall(comm_text)])
+        
+    if 'kids' not in comment_data:
+        return
+    await asyncio.gather(*[crawl_comments(session, kid_id, dir_) 
+                           for kid_id in comment_data['kids']])
 
 
 if __name__ == '__main__':
