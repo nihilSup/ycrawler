@@ -29,3 +29,10 @@ There are several arguments:
 - -i interval of fetching of n top news in seconds
 - -d debug logging
 - -l where to store log file
+
+## Links
+
+<https://realpython.com/async-io-python/#other-features-async-for-and-async-generators-comprehensions>
+<https://medium.com/python-pandemonium/asyncio-coroutine-patterns-beyond-await-a6121486656f>
+<https://medium.com/@yeraydiazdiaz/asyncio-coroutine-patterns-errors-and-cancellation-3bb422e961ff>
+<https://github.com/yeraydiazdiaz/asyncio-coroutine-patterns/blob/master/05_cancelling_coroutines/04_cancelling_coroutines.py>
