@@ -7,21 +7,21 @@ crawls top N news from site:
 - Downloads page from news
 - Traverse comments and downloads all links in them
 - Results are been cached, i.e. crawler doesn't visit same pages
-- Redo every 'interval' seconds
+- Redo every `interval` seconds
 
 ## How to use
 
 ### Install requirements
 
-'''shell
+```shell
 pip install -r requirements.txt
-'''
+```
 
 ### Run
 
-'''shell
+```shell
 python ycrawler.py -n 30 -i 60
-'''
+```
 
 There are several arguments:
 
