@@ -36,3 +36,7 @@ There are several arguments:
 <https://medium.com/python-pandemonium/asyncio-coroutine-patterns-beyond-await-a6121486656f>
 <https://medium.com/@yeraydiazdiaz/asyncio-coroutine-patterns-errors-and-cancellation-3bb422e961ff>
 <https://github.com/yeraydiazdiaz/asyncio-coroutine-patterns/blob/master/05_cancelling_coroutines/04_cancelling_coroutines.py>
+
+## TODO
+
+- Add pdf support
